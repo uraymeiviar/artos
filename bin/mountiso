@@ -1,0 +1,12 @@
+#!/bin/sh
+if [[ $# -eq 0]] 
+then
+	echo "usage : mountiso <path/to/iso/isofilename>"
+	echo "file will be mounted in /media/<isofilename>"
+else
+	ISONAME=$(basename $1 .iso)
+	echo "mounting $1 to /media/${ISONAME}"
+	mkdir -p /media/$ISONAME
+	mount -o loop $1 /media/$ISONAME
+	echo "file $1  mounted to /media/${ISONAME}"
+fi

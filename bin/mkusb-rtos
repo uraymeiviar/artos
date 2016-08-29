@@ -1,0 +1,54 @@
+#!/bin/sh
+if [ $# -eq 0 ]; then
+	echo "usage $0 [disk]"
+	echo "----------------------"
+	echo " "
+	echo "please specify disk id to format using table below"
+	diskutil list
+	echo "----------------------"
+	echo " "
+	echo "example : $0 /dev/disk1"
+else
+	disk=$1
+	efistring=`ioreg -l -p IODeviceTree | grep firmware-abi`
+	efiname=${efistring##* <}
+	efitype="32"
+	if [[ $efiname = "\"EFI64\">" ]]; then
+		efitype="64"
+	fi
+	echo " system type is EFI$efitype"
+	echo " "
+	
+	echo " ================================================"
+	echo " WARNING !"
+	echo " you will format and DESTROY entire data on $disk"
+	echo " "
+	read -p " continue formating? (write \"YES\" to confirm): " -r
+	if [[ $REPLY = "YES" ]]; then
+		diskutil eraseDisk fat32 RTOS GPT $disk
+		
+		result=`diskutil list $disk | grep EFI`
+		parTarget=${result##* }
+		
+		echo " EFI partition is : $parTarget"
+	        echo " system type is EFI$efitype"
+		echo " "
+		echo "    [1/3] mounting EFI partition of $disk..."
+		mkdir -p /Volumes/RTOSEFI
+		sudo mount -t msdos "/dev/$parTarget" /Volumes/RTOSEFI
+		
+		echo "    [2/3] copying EFI data to $disk..."
+		mkdir -p /Volumes/RTOSEFI/EFI
+		cp -rf ./mkusb-data/EFIBASE/* /Volumes/RTOSEFI/EFI
+		if [[ $efitype="64" ]]; then
+			cp -rf ./mkusb-data/EFI64/* /Volumes/RTOSEFI/EFI
+		else
+			cp -rf ./mkusb-data/EFI64/* /Volumes/RTOSEFI/EFI
+		fi
+	else
+		echo " "
+		echo " ........................."
+		echo " not confirmed with \"YES\""
+		echo " process aborted."
+	fi
+fi

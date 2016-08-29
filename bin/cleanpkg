@@ -1,0 +1,9 @@
+#!/bin/bash
+cd $1
+rm -rf ./usr/doc/*
+rm -rf ./usr/man/*
+rm -rf ./var/log/packages
+rm -rf ./var/log/removed_packages
+rm -rf ./var/log/removed_scripts
+rm -rf ./var/log/scripts
+du -sch ./*
