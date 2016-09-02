@@ -1,8 +1,8 @@
 #!/bin/bash
 
 SCRIPT=$0
-INITRAMFS=$1
-DIRECTORY=$2
+INITRAMFS=$(realpath "$1")
+DIRECTORY=$(realpath "$2")
 
 usage()
 {
