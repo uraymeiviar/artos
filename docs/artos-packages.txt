@@ -1,0 +1,105 @@
+==== core ====
+ procps-ng
+ kmod
+ bash
+ coreutil
+ glibc
+ iproute2
+sysvinit
+bash 
+shadow
+util-linux
+eudev
+nano
+
+==== base ====
+
+sysklog
+sudo
+inetutils
+net-tools
+dmidecode
+screen
+nfs-utils
+tar
+grep
+sed
+zlib
+liblzma
+bzip2
+unzip
+p7zip
+e2fsprogs
+m4
+readline
+libtool
+findutils
+gettext
+intltool
+xz
+less
+more
+bzip2
+texinfo
+gzip
+kbd
+openssh
+file
+fuse
+ntfs-3g
+parted
+gptfdisk
+htop
+psmisc
+sshfs
+bc
+acpid
+lm_sensors
+hdparm
+pciutils
+logrotate
+mc
+sysstat
+unrar
+usbutils
+which
+sg3_utils
+fcron
+cifs-utils
+ntp
+wireless-tools
+wpa_supplicant
+nmap
+traceroute
+whois
+curl
+iotop
+
+=== devtools ===
+gcc
+gdb
+llvm
+yasm
+subversion
+libstdc++
+binutils
+patch
+make
+m4
+bison
+flex
+mpfr
+mpc
+pkg-config
+ncurses
+libtool
+autoconf
+automake
+diffutils
+git
+
+=== servers ===
+vsftpd
+samba
+nodejs
+lighttpd
