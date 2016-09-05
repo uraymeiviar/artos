@@ -6,7 +6,7 @@
  glibc
  iproute2
 sysvinit
-bash 
+ bash 
 shadow
 util-linux
 eudev
@@ -76,27 +76,40 @@ curl
 iotop
 
 === devtools ===
-gcc
+ gcc
 gdb
 llvm
-yasm
-subversion
-libstdc++
-binutils
-patch
-make
-m4
-bison
-flex
-mpfr
-mpc
-pkg-config
-ncurses
-libtool
-autoconf
-automake
-diffutils
-git
+ yasm
+ apr
+ apr-util
+ expat
+ subversion
+ libstdc++
+ binutils
+ patch
+ make
+ m4
+ bison
+ flex
+ mpfr
+ mpc
+ gmp
+ pkg-config
+ glib
+ pcre
+ gettext
+ ncurses
+ libtool
+ autoconf
+ automake
+ autogen
+ guile
+ gc
+ libatomic_ops
+ libunistring
+ libffi
+ diffutils
+ git
 
 === servers ===
 vsftpd
