@@ -77,13 +77,16 @@ iotop
 
 === devtools ===
  gcc
+  mpc 
+   mpfr
+    gmp
 gdb
 llvm
  yasm
- apr
- apr-util
- expat
  subversion
+  expat
+  apr
+   apr-util
  libstdc++
  binutils
  patch
@@ -91,9 +94,6 @@ llvm
  m4
  bison
  flex
- mpfr
- mpc
- gmp
  pkg-config
  glib
  pcre
@@ -103,11 +103,11 @@ llvm
  autoconf
  automake
  autogen
- guile
- gc
- libatomic_ops
- libunistring
- libffi
+  guile
+   gc
+   libatomic_ops
+   libunistring
+   libffi
  diffutils
  git
 
