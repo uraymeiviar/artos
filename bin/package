@@ -111,8 +111,10 @@ pkg_build() {
                         done
 
 			echo "analyzing dependencies..." >&2
-			find * -type f -printf '%P\n' > "$DST/../filelist"
-			find * -type f -perm /a+x -exec ldd {} \; \
+			find "$DST/" -type f \
+				| sed -n "s|^$TMP/pkgfs/||p" \
+				| sort  > "$DST/../filelist"
+			find "$DST/" -type f -perm /a+x -exec ldd {} \; \
 				| grep so \
 				| sed -e '/^[^\t]/ d' \
 				| sed -e 's/\t//' \
@@ -121,16 +123,21 @@ pkg_build() {
 				| sort \
 				| uniq > "$DST/../deplist.tmp"
 
-			grep '[^[:blank:]]' < "$DST/../deplist.tmp" > "$DST/../deplist2.tmp"
-
+			if [ $(cat "$DST/../deplist.tmp" | wc -l) -gt 0 ]; then
+				grep '[^[:blank:]]' < "$DST/../deplist.tmp" > "$DST/../deplist2.tmp"
+			fi
 			rm -f "$DST/../deplist"
 			touch "$DST/../deplist"
-			while read deppath; do
-				local rpath=$(realpath --no-symlinks "$deppath")
-				echo "$rpath" >> "$DST/../deplist"
-			done < "$DST/../deplist2.tmp"
+			if [ -f "$DST/../deplist2.tmp" ]; then
+				while read deppath; do
+					if [ ! -z "$deppath" ]; then
+						local rpath=$(realpath --no-symlinks "$deppath")
+						echo "$rpath" >> "$DST/../deplist"
+					fi
+				done < "$DST/../deplist2.tmp"
+				rm "$DST/../deplist2.tmp"
+			fi
 			rm "$DST/../deplist.tmp"
-			rm "$DST/../deplist2.tmp"
 
 			echo "writing metadata..." >&2
 			rm -f "$DST/../info"
@@ -144,7 +151,7 @@ pkg_build() {
 			cp "$CFG" "$DST/../package.buildconf"
 
 			echo "packaging..." >&2
-			tar -Jcf "$CWD/$PKG_DST" "$DST/../"
+			XZ_OPT=-9e tar -Jcf "$CWD/$PKG_DST" "$DST/../"
 			mksquashfs "$DST" "$CWD/$PKG_APP-$PKG_VER.layer" -comp xz -b 64k -Xbcj x86 -noappend
 			du -sch "$DST"
 			du -sch "$CWD/$PKG_DST"
