@@ -1,0 +1,256 @@
+#!/bin/sh
+PKGUTIL_VER="1.0.0"
+set -e
+extract_archive(){
+	local ARCHIVE=$(realpath "$1")
+	local FILE=$(basename "$ARCHIVE")
+	local EXT="${FILE##*.}"
+	local NAME=$(echo $FILE | cut -f 1 -d '.')
+	local DEST=$(realpath ".")
+	local CWD=$(realpath "./")
+
+	echo "extracting $ARCHIVE to $DEST" >&2
+
+	if [ ! -z "$2" ];
+	then
+		DEST=$(realpath "$2")
+		mkdir -p "$DEST"
+		cd "$DEST"
+	fi
+
+        if [ "$EXT" = "txz" ]; then
+                tar -Jxf "$ARCHIVE"
+        elif [ "$EXT" = "tbz2" ]; then
+                tar -jxf "$ARCHIVE"
+        elif [ "$EXT" = "tgz" ]; then
+                tar -zxf "$ARCHIVE"
+	elif [ "$EXT" = "zip" ]; then
+		unzip "$ARCHIVE"
+	elif [ "$EXT" = "rar" ]; then
+		unrar e "$ARCHIVE"
+        fi
+
+	cd "$CWD"
+	echo "$DEST/$NAME"
+}
+
+pkg_install() {
+	local PKG=$1
+	local DST=$2
+	local TMP=`mktemp -d`
+	echo "installing package $PKG to $DST"
+	tar -Jxf "$PKG" -C "$TMP"
+	if [ -d "$TMP" ]; then
+		cd "$TMP"
+		mkdir -p "$DST"
+		cp -rfPp ./pkgfs/* "$DST"
+		cd ..
+		rm -rf "$TMP"
+		echo "done." >&2
+	else
+		echo "failed to extract $PKG" >&2
+	fi
+}
+
+pkg_extract() {
+        local PKG=$1
+        local DST=$2
+        echo "extracting package $PKG to $DST"
+	mkdir -p "$DST"
+        tar -Jxvf "$PKG" -C "$DST"
+        if [ -d "$DST" ]; then
+                echo "done." >&2
+        else
+                echo "failed to extract $PKG" >&2
+        fi
+}
+
+pkg_build() {
+	local CFG=$1
+	echo "package build from $CFG"
+	. "$CFG"
+
+	local FILE="$PKG_APP.$PKG_EXT"
+	if [ ! -f "$FILE" ];
+	then
+		wget "$PKG_URL" -O "$FILE"
+	fi
+
+	if [ -f "$FILE" ];
+	then
+		local EXDIR=$(extract_archive "$FILE")
+		if [ -d "$EXDIR-$PKG_VER" ];
+		then
+			local TMP=`mktemp -d`
+			mkdir -p "$TMP"
+			mkdir -p "$TMP/pkgfs"
+			local DST=$(realpath "$TMP/pkgfs")
+			local SRC="$EXDIR-$PKG_VER"
+			local CWD=$(realpath "./")
+
+			echo "preparing..."
+			cd "$SRC"
+			$(pkg_precompile "$SRC" "$DST")
+
+			echo "compiling..."
+			$(pkg_compile "$SRC" "$DST")
+
+			echo "executing post compile" >&2
+			$(pkg_postcompile "$SRC" "$DST")
+
+			echo "deploying..." >&2
+			$(pkg_deploy "$SRC" "$DST")
+
+			echo "executing post deploy.." >&2
+			$(pkg_postdeploy  "$SRC" "$DST")
+
+                        echo "stripping files..." >&2
+                        STRIPARRAY=`echo $PKG_STRIP | sed 's/\:/\n/g'`
+                        echo "$STRIPARRAY" | while read -r stripfile; do
+                                rm -rf "$DST${stripfile}"
+                        done
+
+			echo "analyzing dependencies..." >&2
+			find * -type f -printf '%P\n' > "$DST/../filelist"
+			find * -type f -perm /a+x -exec ldd {} \; \
+				| grep so \
+				| sed -e '/^[^\t]/ d' \
+				| sed -e 's/\t//' \
+				| sed -e 's/.*=..//' \
+				| sed -e 's/ (0.*)//' \
+				| sort \
+				| uniq > "$DST/../deplist.tmp"
+
+			grep '[^[:blank:]]' < "$DST/../deplist.tmp" > "$DST/../deplist2.tmp"
+
+			rm -f "$DST/../deplist"
+			touch "$DST/../deplist"
+			while read deppath; do
+				local rpath=$(realpath --no-symlinks "$deppath")
+				echo "$rpath" >> "$DST/../deplist"
+			done < "$DST/../deplist2.tmp"
+			rm "$DST/../deplist.tmp"
+			rm "$DST/../deplist2.tmp"
+
+			echo "writing metadata..." >&2
+			rm -f "$DST/../info"
+			touch "$DST/../info"
+			echo "NAME=$PKG_APP" >> "$DST/../info"
+			echo "VER=$PKG_VER" >> "$DST/../info"
+			echo "URL=$PKG_URL" >> "$DST/../info"
+			echo "CC=$PKG_CC" >> "$DST/../info"
+			echo "CFG=$PKG_CFG" >> "$DST/../info"
+			echo "PKGV=$PKGUTIL_VER" >> "$DST/../info"
+			cp "$CFG" "$DST/../package.buildconf"
+
+			echo "packaging..." >&2
+			tar -Jcf "$CWD/$PKG_DST" "$DST/../"
+			mksquashfs "$DST" "$CWD/$PKG_APP-$PKG_VER.layer" -comp xz -b 64k -Xbcj x86 -noappend
+			du -sch "$DST"
+			du -sch "$CWD/$PKG_DST"
+			du -sch "$CWD/$PKG_APP-$PKG_VER.layer"
+			cd "$CWD"
+
+			rm -rf "$TMP"
+			rm -rf "$EXDIR-$PKG_VER"
+			rm "$FILE"
+
+			echo "done [ $PKG_DST ]"
+		else
+			echo "error: unable to extract $FILE"
+		fi
+	else
+		echo "error: unable to get $FILE"
+	fi
+}
+
+CMD="$1"
+if [ "$CMD" = "build" ] || [ "$CMD" = "-b" ];
+then
+	CFGFILE=$2
+	if [ "$CFGFILE" = "" ];
+	then
+		CFGFILE="./package.buildconf"
+	fi
+	CFGFILE=$(realpath "$CFGFILE")
+
+	if [ ! -f "$CFGFILE" ];
+	then
+		echo "build command error:"
+		echo "build config file $CFGFILE not exists"
+	else
+		pkg_build $CFGFILE
+	fi
+elif [ "$CMD" = "install" ] || [ "$CMD" = "-i" ];
+then
+	PKGPATH=$2
+	if [ "$PKGPATH" = "" ];
+	then
+		echo "install command error:"
+		echo "package file not specified"
+	else
+		DESTDIR="$3"
+		if [ "$DESTDIR" = "" ];
+		then
+			DESTDIR="/"
+		fi
+
+		if [ ! -f "$PKGPATH" ];
+		then
+			echo "install command error:"
+			echo "package file $PKGPATH not exists"
+		else
+			PKGPATH=$(realpath "$PKGPATH")
+			DESTDIR=$(realpath "$DESTDIR")
+			pkg_install $PKGPATH $DESTDIR
+		fi
+	fi
+elif [ "$CMD" = "extract" ] || [ "$CMD" = "-e" ];
+then
+        PKGPATH=$2
+        if [ "$PKGPATH" = "" ];
+	then
+                echo "extract command error:"
+		echo "package file not specified"
+        else
+		PKGFILE=$(basename "$PKGPATH")
+		PKGNAME="${PKGFILE%.*}"
+                DESTDIR="$3"
+
+                if [ "$DESTDIR" = "" ];
+		then
+                        DESTDIR="./$PKGNAME"
+                fi
+
+                if [ ! -f "$PKGPATH" ];
+                then
+                        echo "extract command error:"
+                        echo "package file $PKGPATH not exists"
+                else
+                        PKGPATH=$(realpath "$PKGPATH")
+                        DESTDIR=$(realpath "$DESTDIR")
+                        pkg_extract $PKGPATH $DESTDIR
+                fi
+        fi
+else
+	echo "artOS package utility (ver. $PKGUTIL_VER)"
+	echo "uraymeiviar@tes.co.id"
+	echo ""
+	echo "             usage: $0 [command] [options]"
+	echo ""
+	echo "options for each command are :"
+	echo ""
+	echo "(-b) build   [optional:.buildconf file]"
+	echo "             will build package from source, based on build configuration file"
+        echo "             specified in optional parameter, if not specified it will look for"
+	echo "             'package.buildconf' file in current dir"
+	echo ""
+	echo "(-i) install [.package file] [optional:destination prefix]"
+	echo "             will install package to system, which is equal to extract and copy"
+	echo "             precompiled file into '<prefix>/' default is to root '/'"
+	echo ""
+	echo "(-e) extract [.package file] [optional:destination]"
+	echo "             will extract content of package file into destination directory,"
+	echo "             if omitted it will extract to './<package-name>/'"
+	echo ""
+fi
