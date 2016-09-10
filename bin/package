@@ -43,7 +43,7 @@ pkg_install() {
 	if [ -d "$TMP" ]; then
 		cd "$TMP"
 		mkdir -p "$DST"
-		cp -rfPp ./pkgfs/* "$DST"
+		cp -rfPd ./pkgfs/* "$DST"
 		cd ..
 		rm -rf "$TMP"
 		echo "done." >&2
@@ -76,6 +76,12 @@ pkg_build() {
 		wget "$PKG_URL" -O "$FILE"
 	fi
 
+	if [ ! -z "$PKG_PATCH" ];
+	then
+		wget "$PKG_PATCH" -O "$PKG_APP-patches.$PKG_EXT"
+		tar -Jxvf "$PKG_APP-patches.$PKG_EXT"
+	fi
+
 	if [ -f "$FILE" ];
 	then
 		local EXDIR=$(extract_archive "$FILE")
@@ -90,6 +96,14 @@ pkg_build() {
 
 			echo "preparing..."
 			cd "$SRC"
+
+			if [ ! -z "$PKG_PATCH" ]; then
+				echo "patching source..."
+				for patchfile in "../$PKG_APP-$PKG_VER-patches/"*.patch; do
+					patch -p1 < "$patchfile"
+				done
+			fi
+
 			$(pkg_precompile "$SRC" "$DST")
 
 			echo "compiling..."
@@ -111,7 +125,7 @@ pkg_build() {
                         done
 
 			echo "analyzing dependencies..." >&2
-			find "$DST/" -type f \
+			find "$DST/" \
 				| sed -n "s|^$TMP/pkgfs/||p" \
 				| sort  > "$DST/../filelist"
 			find "$DST/" -type f -perm /a+x -exec ldd {} \; \
@@ -161,6 +175,12 @@ pkg_build() {
 			rm -rf "$TMP"
 			rm -rf "$EXDIR-$PKG_VER"
 			rm "$FILE"
+
+		        if [ ! -z "$PKG_PATCH" ];
+		        then
+		                rm "$PKG_APP-patches.$PKG_EXT"
+		                rm -rf "$PKG_APP-$PKG_VER-patches"
+		        fi
 
 			echo "done [ $PKG_DST ]"
 		else

@@ -1,0 +1,36 @@
+#!/bin/bash
+PKG_APP="subversion"
+PKG_VER="1.9.4"
+PKG_EXT="txz"
+PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
+PKG_CC="-O3 -march=x86-64"
+PKG_CFG="--disable-nls --prefix=/usr"
+PKG_DST="$PKG_APP-$PKG_VER.package"
+PKG_STRIP="/usr/share/man:/usr/share/doc:/usr/share/info:/usr/share/locale"
+
+pkg_precompile(){
+#	if [ ! -f "./sqlite-amalgamation.zip" ]; then
+#        	wget https://www.sqlite.org/2016/sqlite-amalgamation-3140100.zip -O ./sqlite-amalgamation.zip
+#	        unzip sqlite-amalgamation.zip
+#	        mv ./sqlite-amalgamation-3140100 "./sqlite-amalgamation"
+#	fi
+
+        CFLAGS="$PKG_CC" ./configure $PKG_CFG >&2
+}
+
+pkg_compile(){
+        CFLAGS="$PKG_CC" make -s >&2
+}
+
+pkg_postcompile(){
+        echo "postcompile done" >&2
+}
+
+pkg_deploy(){
+        make -s DESTDIR="$2" install >&2
+}
+
+pkg_postdeploy(){
+        echo "postinstall done" >&2
+}
+

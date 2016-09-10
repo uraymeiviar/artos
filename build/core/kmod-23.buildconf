@@ -1,0 +1,42 @@
+#!/bin/bash
+PKG_APP="kmod"
+PKG_VER="23"
+PKG_EXT="txz"
+PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
+PKG_CC="-O3 -march=x86-64"
+PKG_CFG="--silent --prefix=/usr --libdir=/usr/lib64 --disable-nls --enable-experimental --disable-manpages --disable-test-modules --with-xz --with-zlib"
+PKG_DST="$PKG_APP-$PKG_VER.package"
+PKG_STRIP="/usr/share:/share"
+
+pkg_precompile(){
+	mkdir ./bash_build
+	cd ./bash_build
+	CFLAGS="$PKG_CC" ../configure $PKG_CFG >&2
+}
+
+pkg_compile(){
+	cd ./bash_build
+	CFLAGS="$PKG_CC" make -s >&2
+}
+
+pkg_postcompile(){
+	echo "postcompile done" >&2
+}
+
+pkg_deploy(){
+	cd ./bash_build
+	make -s DESTDIR="$2" install >&2
+	mv "$2/usr/bin" "$2/"
+	cd "$2/bin"
+	ln -s kmod lsmod
+	ln -s kmod rmmod
+	ln -s kmod insmon
+	ln -s kmod modinfo
+	ln -s kmod modprobe
+	ln -s kmod depmod
+	strip -s kmod
+}
+
+pkg_postdeploy(){
+	echo "postinstall done" >&2
+}

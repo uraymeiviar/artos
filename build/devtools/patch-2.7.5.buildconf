@@ -1,0 +1,30 @@
+#!/bin/bash
+PKG_APP="patch"
+PKG_VER="2.7.5"
+PKG_EXT="txz"
+PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
+PKG_CC="-O3 -march=x86-64"
+PKG_CFG="--silent --disable-nls --prefix=/usr"
+PKG_DST="$PKG_APP-$PKG_VER.package"
+PKG_STRIP="/usr/share/man:/usr/share/doc:/usr/share/info:/usr/share/locale"
+
+pkg_precompile(){
+        CFLAGS="$PKG_CC" ./configure $PKG_CFG >&2
+}
+
+pkg_compile(){
+        CFLAGS="$PKG_CC" make -s >&2
+}
+
+pkg_postcompile(){
+        echo "postcompile done" >&2
+}
+
+pkg_deploy(){
+        make -s DESTDIR="$2" install >&2
+}
+
+pkg_postdeploy(){
+        echo "postinstall done" >&2
+}
+

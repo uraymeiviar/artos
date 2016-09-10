@@ -1,0 +1,65 @@
+#!/bin/bash
+PKG_APP="glibc"
+PKG_VER="2.24"
+PKG_EXT="txz"
+PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
+PKG_CC="-O3 -march=x86-64"
+PKG_CFG="--prefix=/usr --disable-nls --enable-shared --disable-multiarch --disable-multi-arch--enable-mathvec --enable-pt_chown --without-selinux --with-fp"
+PKG_DST="$PKG_APP-$PKG_VER.package"
+PKG_STRIP="/usr/share/man:/usr/share/doc:/usr/share/info:/usr/share/locale:/var/db"
+
+pkg_precompile(){
+	rm -rf ./glibc_build
+	mkdir -p ./glibc_build
+	cd ./glibc_build
+	CFLAGS="$PKG_CC" ../configure $PKG_CFG >&2
+}
+
+pkg_compile(){
+	cd ./glibc_build
+	CFLAGS="$PKG_CC" make >&2
+}
+
+pkg_postcompile(){
+	echo "postcompile done" >&2
+}
+
+pkg_deploy(){
+	cd ./glibc_build
+	make -s DESTDIR="$2" install >&2
+
+	local glibc_temp=$(mktemp -d)
+	echo "cleaning charmap" >&2
+	cp "$2/usr/share/i18n/charmaps/UTF-8.gz" "$glibc_temp/"
+	rm -f "$2/usr/share/i18n/charmaps"/*
+	mv "$glibc_temp/UTF-8.gz" "$2/usr/share/i18n/charmaps"
+
+	echo "cleaning locales" >&2
+	cp "$2/usr/share/i18n/locales/en_US" "$glibc_temp/"
+	rm -f "$2/usr/share/i18n/locales"/*
+	mv "$glibc_temp/en_US" "$2/usr/share/i18n/locales/"
+
+	echo "cleaning gconv" >&2
+	cp "$2/usr/lib64/gconv/"UTF-*.so "$glibc_temp/"
+	cp "$2/usr/lib64/gconv/UNICODE.so" "$glibc_temp/"
+	rm -rf "$2/usr/lib64/gconv"/*
+	cp "$glibc_temp"/* "$2/usr/lib64/gconv/"
+
+	echo "configuring ld.so.conf" >&2
+	echo "include /etc/ld.so.conf.d/*.conf" > "$2/etc/ld.so.conf"
+	if [ -f "$2/etc/ld.so.cache" ]; then
+		rm "$2/etc/ld.so.cache"
+	fi
+	mkdir -p "$2/etc/ld.so.conf.d"
+	echo "/lib" > "$2/etc/ld.so.conf.d/glibc.conf"
+	echo "/usr/lib" >> "$2/etc/ld.so.conf.d/glibc.conf"
+	echo "/usr/lib64" >> "$2/etc/ld.so.conf.d/glibc.conf"
+	echo "/lib64" >> "$2/etc/ld.so.conf.d/glibc.conf"
+
+	echo "clearing temp dir" >&2
+	rm -rf "$glibc_temp"
+}
+
+pkg_postdeploy(){
+	echo "postinstall done" >&2
+}

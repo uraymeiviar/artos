@@ -1,0 +1,39 @@
+#!/bin/bash
+PKG_APP="bash"
+PKG_VER="4.4-rc2"
+PKG_EXT="txz"
+PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
+PKG_CC="-O3 -march=x86-64"
+PKG_CFG="--silent --prefix=/ --libdir=/usr/lib64 --disable-nls --enable-threads=posix --enable-alias --enable-arith-for-command --enable-array-variables --enable-bang-history --enable-brace-expansion --enable-casemod-attributes --enable-casemod-expansions --enable-cond-command --enable-cond-regexp --enable-coprocesses --enable-directory-stack --enable-history --enable-job-control --enable-multibyte --enable-process-substitution --enable-progcomp --enable-prompt-string-decoding --enable-readline --enable-restricted --enable-select --enable-extended-glob"
+PKG_DST="$PKG_APP-$PKG_VER.package"
+PKG_STRIP="/usr/share:/share"
+
+pkg_precompile(){
+	mkdir ./bash_build
+	cd ./bash_build
+	CFLAGS="$PKG_CC" ../configure $PKG_CFG >&2
+}
+
+pkg_compile(){
+	cd ./bash_build
+	CFLAGS="$PKG_CC" make -s >&2
+}
+
+pkg_postcompile(){
+	echo "postcompile done" >&2
+}
+
+pkg_deploy(){
+	cd ./bash_build
+	make -s DESTDIR="$2" install >&2
+	mkdir -p "$2/usr/include"
+	mv -f "$2/include"/* "$2/usr/include"
+	mv -f "$2/usr/lib64/bash"/* "$2/bin/"
+	rm -rf "$2/include"
+	rm -rf "$2/usr/lib64"
+	rm "$2/bin/Makefile.inc"
+}
+
+pkg_postdeploy(){
+	echo "postinstall done" >&2
+}
