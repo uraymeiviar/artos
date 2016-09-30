@@ -4,7 +4,7 @@ PKG_VER="6.2.0"
 PKG_EXT="txz"
 PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
 PKG_CC="-O2 -march=x86-64"
-PKG_CFG="--silent --disable-nls --prefix=/usr --disable-multilib --enable-ld=yes --enable-libssp --enable-lto --enable-languages=c,c++"
+PKG_CFG="--silent --libdir=/usr/lib64 --disable-nls --prefix=/usr --disable-multilib --enable-ld=yes --enable-libssp --enable-lto --enable-languages=c,c++"
 PKG_DST="$PKG_APP-$PKG_VER.package"
 PKG_STRIP="/usr/share"
 
