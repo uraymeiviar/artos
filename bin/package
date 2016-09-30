@@ -34,6 +34,94 @@ extract_archive(){
 	echo "$DEST/$NAME"
 }
 
+pkg_deplist() {
+	local PKGPATH=$(realpath "$1")
+	local DEST=$(realpath "$2")
+	find "$PKGPATH" -type f -perm /a+x -exec ldd {} \; \
+                                | grep so \
+                                | sed -e '/^[^\t]/ d' \
+                                | sed -e 's/\t//' \
+                                | sed -e 's/.*=..//' \
+                                | sed -e 's/ (0.*)//' \
+                                | sort \
+                                | uniq > "$DEST.tmp"
+
+	if [ $(cat "$DEST.tmp" | wc -l) -gt 0 ]; then
+		grep '[^[:blank:]]' < "$DEST.tmp" > "$DEST.tmp2"
+	fi
+	rm -f "$DEST"
+	touch "$DEST"
+	if [ -f "$DEST.tmp2" ]; then
+		while read deppath; do
+			if [ ! -z "$deppath" ]; then
+				local rpath=$(realpath --no-symlinks "$deppath")
+				echo "$rpath" >> "$DEST"
+			fi
+		done < "$DEST.tmp2"
+		rm "$DEST.tmp2"
+	fi
+	rm "$DEST.tmp"
+}
+
+pkg_filelist() {
+	local PKGPATH=$(realpath "$1")
+	local FILEDEST=$(realpath "$2")
+	local STRIP_PREFIX="$3"
+	find "$PKGPATH" \
+		| sed -n "s|^$STRIP_PREFIX||p" \
+		| sort  > "$FILEDEST"
+}
+
+pkg_pack() {
+	local DST=$1
+	local METAPATH=$2
+	local CFG=$3
+	local PKG_PATH=$4
+	local PKG_DST="$PKG_PATH/$PKG_APP-$PKG_VER.package"
+	if [ ! -z $5 ]; then
+		local PKG_DST="$PKG_PATH/$PKG_APP-$PKG_VER-$5.package"
+	fi
+
+	echo "packing $DST to $PKG_DST" >&2
+
+	echo "analyzing dependencies..." >&2
+	pkg_filelist "$DST/" "$DST/../filelist" "$DST/"
+	pkg_deplist "$DST/" "$DST/../deplist"
+	cp "$METAPATH" "$DST/"../info
+	cp "$CFG" "$DST/"../package.buildconf
+
+        echo "compressing $PKG_DST" >&2
+        XZ_OPT=-9e tar -Jcf "$PKG_DST" "$DST/../"
+        du -sch "$DST"
+        du -sch "$PKG_DST"
+}
+
+pkg_split() {
+        local BASE=$(realpath "$1")
+        local FILE="$2"
+        local DEST=$(realpath "$3")
+
+        ALT_PKG_ARRAY=`echo $FILE | sed 's/\;/\n/g'`
+        echo "$ALT_PKG_ARRAY" | while read -r altpkg; do
+                ALT_PKG_CONTENT=$(echo "$altpkg" | cut -d "=" -f 2)
+                ALT_PKG_NAME=$(echo "$altpkg" | cut -d "=" -f 1)
+                echo "PACKAGE $ALT_PKG_NAME = [$ALT_PKG_CONTENT]"
+                mkdir -p "$BASE/$ALT_PKG_NAME"
+                mkdir -p "$BASE/$ALT_PKG_NAME/pkgfs"
+                ALT_PKG_DEST="$ALT_PKG_NAME/pkgfs"
+                ALT_PKG_CONTENT_ARRAY=`echo $ALT_PKG_CONTENT | sed 's/\:/\n/g'`
+                echo "$ALT_PKG_CONTENT_ARRAY" | while read -r altpkgcontent; do
+                        ALT_PKG_CONTENT_PATH=$(dirname "$altpkgcontent")
+                        ALT_PKG_CONTENT_FILE=$(basename "$altpkgcontent")
+                        ALT_PKG_MOVE_SRC="$BASE/$ALT_PKG_CONTENT_PATH"
+                        ALT_PKG_MOVE_DST="$DEST/$ALT_PKG_DEST$ALT_PKG_CONTENT_PATH"
+                        mkdir -p "$ALT_PKG_MOVE_DST"
+                        echo "moving $altpkgcontent = $ALT_PKG_MOVE_SRC/$ALT_PKG_CONTENT_FILE ->  $ALT_PKG_MOVE_DST"
+                        mv -f "$ALT_PKG_MOVE_SRC/"$ALT_PKG_CONTENT_FILE "$ALT_PKG_MOVE_DST" 2>/dev/null; true
+                done
+        done
+}
+
 pkg_install() {
 	local PKG=$1
 	local DST=$2
@@ -87,6 +175,7 @@ pkg_build() {
 		local EXDIR=$(extract_archive "$FILE")
 		if [ -d "$EXDIR-$PKG_VER" ];
 		then
+			#package destination
 			local TMP=`mktemp -d`
 			mkdir -p "$TMP"
 			mkdir -p "$TMP/pkgfs"
@@ -110,13 +199,13 @@ pkg_build() {
 			$(pkg_compile "$SRC" "$DST")
 
 			echo "executing post compile" >&2
-			$(pkg_postcompile "$SRC" "$DST")
+			$(pkg_postcompile "$SRC" "$DST" "$DST_ALT")
 
 			echo "deploying..." >&2
-			$(pkg_deploy "$SRC" "$DST")
+			$(pkg_deploy "$SRC" "$DST" "$DST_ALT")
 
 			echo "executing post deploy.." >&2
-			$(pkg_postdeploy  "$SRC" "$DST")
+			$(pkg_postdeploy  "$SRC" "$DST" "$DST_ALT")
 
                         echo "stripping files..." >&2
                         STRIPARRAY=`echo $PKG_STRIP | sed 's/\:/\n/g'`
@@ -124,57 +213,25 @@ pkg_build() {
                                 rm -rf "$DST${stripfile}"
                         done
 
-			echo "analyzing dependencies..." >&2
-			find "$DST/" \
-				| sed -n "s|^$TMP/pkgfs/||p" \
-				| sort  > "$DST/../filelist"
-			find "$DST/" -type f -perm /a+x -exec ldd {} \; \
-				| grep so \
-				| sed -e '/^[^\t]/ d' \
-				| sed -e 's/\t//' \
-				| sed -e 's/.*=..//' \
-				| sed -e 's/ (0.*)//' \
-				| sort \
-				| uniq > "$DST/../deplist.tmp"
+ 			echo "writing metadata..." >&2
+                        local METAFILENAME=`mktemp`
+                        local METAPATH=$(realpath "$METAFILENAME")
+                        touch "$METAPATH"
+                        echo "NAME=$PKG_APP" >> "$METAPATH"
+                        echo "VER=$PKG_VER" >> "$METAPATH"
+                        echo "URL=$PKG_URL" >> "$METAPATH"
+                        echo "CC=$PKG_CC" >> "$METAPATH"
+                        echo "CFG=$PKG_CFG" >> "$METAPATH"
+                        echo "PKGV=$PKGUTIL_VER" >> "$METAPATH"
+                        cp "$CFG" "$DST/../package.buildconf"
 
-			if [ $(cat "$DST/../deplist.tmp" | wc -l) -gt 0 ]; then
-				grep '[^[:blank:]]' < "$DST/../deplist.tmp" > "$DST/../deplist2.tmp"
-			fi
-			rm -f "$DST/../deplist"
-			touch "$DST/../deplist"
-			if [ -f "$DST/../deplist2.tmp" ]; then
-				while read deppath; do
-					if [ ! -z "$deppath" ]; then
-						local rpath=$(realpath --no-symlinks "$deppath")
-						echo "$rpath" >> "$DST/../deplist"
-					fi
-				done < "$DST/../deplist2.tmp"
-				rm "$DST/../deplist2.tmp"
-			fi
-			rm "$DST/../deplist.tmp"
-
-			echo "writing metadata..." >&2
-			rm -f "$DST/../info"
-			touch "$DST/../info"
-			echo "NAME=$PKG_APP" >> "$DST/../info"
-			echo "VER=$PKG_VER" >> "$DST/../info"
-			echo "URL=$PKG_URL" >> "$DST/../info"
-			echo "CC=$PKG_CC" >> "$DST/../info"
-			echo "CFG=$PKG_CFG" >> "$DST/../info"
-			echo "PKGV=$PKGUTIL_VER" >> "$DST/../info"
-			cp "$CFG" "$DST/../package.buildconf"
-
-			echo "packaging..." >&2
-			XZ_OPT=-9e tar -Jcf "$CWD/$PKG_DST" "$DST/../"
-			mksquashfs "$DST" "$CWD/$PKG_APP-$PKG_VER.layer" -comp xz -b 64k -Xbcj x86 -noappend
-			du -sch "$DST"
-			du -sch "$CWD/$PKG_DST"
-			du -sch "$CWD/$PKG_APP-$PKG_VER.layer"
+			pkg_pack "$DST" "$METAPATH" "$CFG" "$CWD"
 			cd "$CWD"
 
 			rm -rf "$TMP"
 			rm -rf "$EXDIR-$PKG_VER"
-			rm "$FILE"
+			rm -f "$FILE"
+			rm -f "$METAPATH"
 
 		        if [ ! -z "$PKG_PATCH" ];
 		        then
@@ -182,7 +239,7 @@ pkg_build() {
 		                rm -rf "$PKG_APP-$PKG_VER-patches"
 		        fi
 
-			echo "done [ $PKG_DST ]"
+			echo "done [ $PKG_APP-$PKG_VER.package ]"
 		else
 			echo "error: unable to extract $FILE"
 		fi
@@ -259,6 +316,9 @@ then
                         pkg_extract $PKGPATH $DESTDIR
                 fi
         fi
+elif [ "$CMD" = "filelist" ] || [ "$CMD" = "-f" ];
+then
+	pkg_filelist $2 $3 $4
 else
 	echo "artOS package utility (ver. $PKGUTIL_VER)"
 	echo "uraymeiviar@tes.co.id"
