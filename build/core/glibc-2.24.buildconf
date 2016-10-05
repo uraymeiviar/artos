@@ -5,8 +5,8 @@ PKG_EXT="txz"
 PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
 PKG_CC="-O3 -march=x86-64"
 PKG_CFG="--prefix=/usr --disable-nls --enable-shared --disable-multiarch --disable-multi-arch--enable-mathvec --enable-pt_chown --without-selinux --with-fp"
-PKG_DST="$PKG_APP-$PKG_VER.package"
 PKG_STRIP="/usr/share/man:/usr/share/doc:/usr/share/info:/usr/share/locale:/var/db"
+PKG_ALT="dev=/usr/include:/usr/lib64/*.a:/usr/lib64/*.o:/usr/lib64/libc.so:/usr/lib64/libm.so:/usr/lib64/libpthread.so"
 
 pkg_precompile(){
 	rm -rf ./glibc_build
@@ -53,6 +53,7 @@ pkg_deploy(){
 	mkdir -p "$2/etc/ld.so.conf.d"
 	echo "/lib" > "$2/etc/ld.so.conf.d/glibc.conf"
 	echo "/usr/lib" >> "$2/etc/ld.so.conf.d/glibc.conf"
+        echo "/usr/lib32" >> "$2/etc/ld.so.conf.d/glibc.conf"
 	echo "/usr/lib64" >> "$2/etc/ld.so.conf.d/glibc.conf"
 	echo "/lib64" >> "$2/etc/ld.so.conf.d/glibc.conf"
 

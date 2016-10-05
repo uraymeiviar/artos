@@ -76,11 +76,7 @@ pkg_pack() {
 	local DST=$1
 	local METAPATH=$2
 	local CFG=$3
-	local PKG_PATH=$4
-	local PKG_DST="$PKG_PATH/$PKG_APP-$PKG_VER.package"
-	if [ ! -z $5 ]; then
-		local PKG_DST="$PKG_PATH/$PKG_APP-$PKG_VER-$5.package"
-	fi
+	local PKG_DST=$4
 
 	echo "packing $DST to $PKG_DST" >&2
 
@@ -97,28 +93,36 @@ pkg_pack() {
 }
 
 pkg_split() {
-        local BASE=$(realpath "$1")
-        local FILE="$2"
-        local DEST=$(realpath "$3")
+        local DST=$1
+        local METAPATH=$2
+        local CFG=$3
+        local PKG_PATH=$4
 
-        ALT_PKG_ARRAY=`echo $FILE | sed 's/\;/\n/g'`
+        ALT_PKG_ARRAY=`echo "$PKG_ALT" | sed 's/\;/\n/g'`
         echo "$ALT_PKG_ARRAY" | while read -r altpkg; do
                 ALT_PKG_CONTENT=$(echo "$altpkg" | cut -d "=" -f 2)
                 ALT_PKG_NAME=$(echo "$altpkg" | cut -d "=" -f 1)
-                echo "PACKAGE $ALT_PKG_NAME = [$ALT_PKG_CONTENT]"
+                echo "PACKAGE $ALT_PKG_NAME = [$ALT_PKG_CONTENT]" >&2
+		local BASE=`mktemp -d`
+                mkdir -p "$BASE"
                 mkdir -p "$BASE/$ALT_PKG_NAME"
                 mkdir -p "$BASE/$ALT_PKG_NAME/pkgfs"
-                ALT_PKG_DEST="$ALT_PKG_NAME/pkgfs"
+		local ALT_DST=$(realpath "$BASE/$ALT_PKG_NAME/pkgfs")
+
                 ALT_PKG_CONTENT_ARRAY=`echo $ALT_PKG_CONTENT | sed 's/\:/\n/g'`
                 echo "$ALT_PKG_CONTENT_ARRAY" | while read -r altpkgcontent; do
                         ALT_PKG_CONTENT_PATH=$(dirname "$altpkgcontent")
                         ALT_PKG_CONTENT_FILE=$(basename "$altpkgcontent")
-                        ALT_PKG_MOVE_SRC="$BASE/$ALT_PKG_CONTENT_PATH"
-                        ALT_PKG_MOVE_DST="$DEST/$ALT_PKG_DEST$ALT_PKG_CONTENT_PATH"
+                        ALT_PKG_MOVE_SRC="$DST/$ALT_PKG_CONTENT_PATH"
+                        ALT_PKG_MOVE_DST="$ALT_DST/$ALT_PKG_CONTENT_PATH"
                         mkdir -p "$ALT_PKG_MOVE_DST"
-                        echo "moving $altpkgcontent = $ALT_PKG_MOVE_SRC/$ALT_PKG_CONTENT_FILE ->  $ALT_PKG_MOVE_DST"
+                        echo "moving $altpkgcontent = $ALT_PKG_MOVE_SRC/$ALT_PKG_CONTENT_FILE ->  $ALT_PKG_MOVE_DST" >&2
                         mv -f "$ALT_PKG_MOVE_SRC/"$ALT_PKG_CONTENT_FILE "$ALT_PKG_MOVE_DST" 2>/dev/null; true
                 done
+
+		local PKG_DST="$PKG_PATH/$PKG_APP-$PKG_VER-$ALT_PKG_NAME.package"
+		pkg_pack "$ALT_DST" "$METAPATH" "$CFG" "$PKG_DST"
+		rm -rf "$BASE"
         done
 }
 
@@ -225,7 +229,11 @@ pkg_build() {
                         echo "PKGV=$PKGUTIL_VER" >> "$METAPATH"
                         cp "$CFG" "$DST/../package.buildconf"
 
-			pkg_pack "$DST" "$METAPATH" "$CFG" "$CWD"
+			if [ ! -z "$PKG_ALT" ]; then
+				pkg_split "$DST" "$METAPATH" "$CFG" "$CWD"
+			fi
+
+			pkg_pack "$DST" "$METAPATH" "$CFG" "$CWD/$PKG_APP-$PKG_VER.package"
 			cd "$CWD"
 
 			rm -rf "$TMP"
