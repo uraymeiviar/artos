@@ -1,0 +1,40 @@
+#!/bin/bash
+PKG_APP="net-tools"
+PKG_VER="1.60"
+PKG_EXT="txz"
+PKG_URL="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER.$PKG_EXT"
+PKG_PATCH="http://public.tes.co.id/artOS/src/$PKG_APP/$PKG_APP-$PKG_VER-patches.$PKG_EXT"
+PKG_CC="-O3 -march=x86-64"
+PKG_CFG="--prefix=/ --bindir=/bin --sbindir=/bin --libdir=/lib --sysconfdir=/etc --disable-nls --enable-shared --disable-multiarch --disable-rpath --disable-doc --without-selinux --enable-threads=posix --disable-debug"
+PKG_STRIP="/share/man:/share/doc:/share/info:/share/locale:/var/db"
+
+pkg_precompile(){
+	echo "precompile done" >&2
+}
+
+pkg_compile(){
+	CFLAGS="$PKG_CC" make >&2
+}
+
+pkg_postcompile(){
+	echo "postcompile done" >&2
+}
+
+pkg_deploy(){
+	mkdir -p "$2/bin"
+	cp arp "$2/bin"
+	cp hostname "$2/bin"
+	cp ifconfig "$2/bin"
+	cp ipmaddr "$2/bin"
+	cp iptunnel "$2/bin"
+	cp mii-tool "$2/bin"
+	cp nameif "$2/bin"
+	cp plipconfig "$2/bin"
+	cp rarp "$2/bin"
+	cp route "$2/bin"
+	cp slattach "$2/bin"
+}
+
+pkg_postdeploy(){
+	echo "postinstall done" >&2
+}

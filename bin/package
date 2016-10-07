@@ -116,8 +116,13 @@ pkg_split() {
                         ALT_PKG_MOVE_SRC="$DST/$ALT_PKG_CONTENT_PATH"
                         ALT_PKG_MOVE_DST="$ALT_DST/$ALT_PKG_CONTENT_PATH"
                         mkdir -p "$ALT_PKG_MOVE_DST"
-                        echo "moving $altpkgcontent = $ALT_PKG_MOVE_SRC/$ALT_PKG_CONTENT_FILE ->  $ALT_PKG_MOVE_DST" >&2
-                        mv -f "$ALT_PKG_MOVE_SRC/"$ALT_PKG_CONTENT_FILE "$ALT_PKG_MOVE_DST" 2>/dev/null; true
+			local IS_EXIST=`ls "$ALT_PKG_MOVE_SRC"/"$ALT_PKG_CONTENT_FILE" 1> /dev/null 2>&1`
+			if $IS_EXIST; then
+                        	echo "moving $altpkgcontent = $ALT_PKG_MOVE_SRC/$ALT_PKG_CONTENT_FILE ->  $ALT_PKG_MOVE_DST" >&2
+	                        mv -f "$ALT_PKG_MOVE_SRC/"$ALT_PKG_CONTENT_FILE "$ALT_PKG_MOVE_DST" 2>/dev/null; true
+			else
+				echo "ignoring ALT_PKG $ALT_PKG_MOVE_SRC/$ALT_PKG_CONTENT_FILE" >&2
+			fi
                 done
 
 		local PKG_DST="$PKG_PATH/$PKG_APP-$PKG_VER-$ALT_PKG_NAME.package"
@@ -170,7 +175,10 @@ pkg_build() {
 
 	if [ ! -z "$PKG_PATCH" ];
 	then
-		wget "$PKG_PATCH" -O "$PKG_APP-patches.$PKG_EXT"
+		if [ ! -f "$PKG_APP-patches.$PKG_EXT" ]; 
+		then
+			wget "$PKG_PATCH" -O "$PKG_APP-patches.$PKG_EXT"
+		fi
 		tar -Jxvf "$PKG_APP-patches.$PKG_EXT"
 	fi
 
@@ -324,9 +332,16 @@ then
                         pkg_extract $PKGPATH $DESTDIR
                 fi
         fi
+elif [ "$CMD" = "deplist" ] || [ "$CMD" = "-d" ];
+then
+	pkg_deplist $2 $3
 elif [ "$CMD" = "filelist" ] || [ "$CMD" = "-f" ];
 then
-	pkg_filelist $2 $3 $4
+	STRIP=$4
+	if [ -z $4 ]; then
+		STRIP=$(realpath "$2")
+	fi
+	pkg_filelist $2 $3 "$STRIP"
 else
 	echo "artOS package utility (ver. $PKGUTIL_VER)"
 	echo "uraymeiviar@tes.co.id"
