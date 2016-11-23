@@ -6,3 +6,5 @@ rm -rf ./tools/*
 ./build-gcc-pass1.sh
 ./build-linuxheaders.sh
 ./build-glibc.sh
+./build-binutils-pass2.sh
+./build-gcc-pass2.sh

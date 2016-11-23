@@ -37,3 +37,4 @@ echo "testing $PKG_BUILD"
 echo 'int main(){}' > ./glibc-test.c
 $LFS_TGT-gcc ./glibc-test.c
 readelf -l a.out | grep ': /tools'
+rm -v glibc-test.c a.out
