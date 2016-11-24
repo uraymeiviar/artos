@@ -8,3 +8,12 @@ rm -rf ./tools/*
 ./build-glibc.sh
 ./build-binutils-pass2.sh
 ./build-gcc-pass2.sh
+./build-check.sh
+./build-ncurses.sh
+./build-bash.sh
+./build-bzip2.sh
+./build-coreutils.sh
+./build-diffutils.sh
+./build-file.sh
+./build-findutils.sh
+./build-gawk.sh
