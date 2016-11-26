@@ -1,4 +1,5 @@
 #!/bin/sh
+source ./config.sh
 rm -rf ./builds/*
 rm -rf ./tools/*
 ./init.sh
@@ -17,3 +18,16 @@ rm -rf ./tools/*
 ./build-file.sh
 ./build-findutils.sh
 ./build-gawk.sh
+./build-gettext.sh
+./build-grep.sh
+./build-gzip.sh
+./build-m4.sh
+./build-make.sh
+./build-patch.sh
+./build-perl.sh
+./build-sed.sh
+./build-tar.sh
+./build-texinfo.sh
+./build-util-linux.sh
+./build-xz.sh
+chown -R root:root $LFS/tools
