@@ -1,7 +1,7 @@
 #!/bin/sh
 source ./config.sh
 rm -rf ./builds/*
-rm -rf ./tools/*
+rm -rf $LFS/tools/*
 ./init.sh
 ./build-binutils-pass1.sh
 ./build-gcc-pass1.sh
@@ -30,4 +30,5 @@ rm -rf ./tools/*
 ./build-texinfo.sh
 ./build-util-linux.sh
 ./build-xz.sh
-chown -R root:root $LFS/tools
+./strip.sh
+./build-chroot-fs.sh
